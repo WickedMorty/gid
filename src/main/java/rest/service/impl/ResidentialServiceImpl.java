@@ -7,6 +7,9 @@ import bitrix.repository.IFileRepository;
 import bitrix.repository.IblockRepository;
 import bitrix.repository.ResidentialRepository;
 import bitrix.repository.param.*;
+import nar.NarXMLParser;
+import nar.entity.Apartment;
+import other.DownloadFileFromUrl;
 import rest.service.ResidentialService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -15,6 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Service
 public class ResidentialServiceImpl implements ResidentialService {
@@ -90,6 +94,12 @@ public class ResidentialServiceImpl implements ResidentialService {
         List<Material> materialList = materialRepository.findAll();
         List<Pay> payList = payRepository.findAll();
         List<Banks> banksList = banksRepository.findAll();
+        List<Apartment> apartmentList = null;
+
+        String outputFile = System.getProperty("user.dir") + "\\apartment.xml";
+        if(DownloadFileFromUrl.DownloadFileFromUrl("http://mls-nsk.ru/files/newbuilding_export.yml", outputFile)) {
+            apartmentList = NarXMLParser.parsingXmlFile(outputFile);
+        }
 
 
         List<Residential> residentialList = residentialRepository.findAll();
@@ -325,6 +335,15 @@ public class ResidentialServiceImpl implements ResidentialService {
                     houseOut.setBank(test);
                 }
 
+                List<Apartment> apartmentsByDeveloper = apartmentList.stream()
+                        .filter(item -> item.getDeveloper().equals(residentialOut.getName()))
+                        .collect(Collectors.toList());
+
+                houseOut.setApartments(apartmentsByDeveloper.stream()
+                        .filter(item -> item.getAddress().equals(houseOut.getName()))
+                        .collect(Collectors.toList())
+                );
+
                 houseOutList.add(houseOut);
             }
 
@@ -333,8 +352,6 @@ public class ResidentialServiceImpl implements ResidentialService {
             residentialOutList.add(residentialOut);
         }
 
-
-        
         return residentialOutList;
     }
 }

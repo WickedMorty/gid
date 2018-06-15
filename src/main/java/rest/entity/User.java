@@ -32,6 +32,9 @@ public class User {
     @Column(name = "personal_mobile")
     private String mobile;
 
+    @Column(name = "work_department")
+    private Integer department;
+
     @Column(name = "personal_birthday")
     private Date birthday;
 
@@ -112,5 +115,13 @@ public class User {
 
     public void setActive(boolean active) {
         this.active = active;
+    }
+
+    public Integer getDepartment() {
+        return department;
+    }
+
+    public void setDepartment(Integer department) {
+        this.department = department;
     }
 }

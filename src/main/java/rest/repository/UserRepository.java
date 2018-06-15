@@ -12,4 +12,7 @@ public interface UserRepository extends JpaRepository<User, Integer> {
     @Query("SELECT u FROM User u WHERE md5(CONCAT(LOWER(u.login), LOWER(u.password))) = :mdsumm")
     public User findByMd5(@Param("mdsumm") String mdsumm);
 
+    @Query("SELECT u FROM User u WHERE lower(u.login) = lower(:login) AND lower(u.password) = lower(:password)")
+    public User findByLoginAndPassword(@Param("login") String login, @Param("password") String password);
+
 }

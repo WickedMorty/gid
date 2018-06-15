@@ -321,6 +321,8 @@ public class ResidentialOut {
         }
 
         for (HouseOut house: houses) {
+
+
             if(house.getDeadline() != null) {
                 if (house.getDeadline().toLowerCase().contains(searchString)) {
                     return true;

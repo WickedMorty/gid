@@ -1,5 +1,7 @@
 package bitrix.entity;
 
+import nar.entity.Apartment;
+
 import java.util.List;
 
 public class HouseOut {
@@ -11,6 +13,7 @@ public class HouseOut {
     private String material;
     private List<String> payment;
     private List<String> bank;
+    private List<Apartment> apartments;
 
     public HouseOut() {
     }
@@ -77,5 +80,13 @@ public class HouseOut {
 
     public void setBank(List<String> bank) {
         this.bank = bank;
+    }
+
+    public List<Apartment> getApartments() {
+        return apartments;
+    }
+
+    public void setApartments(List<Apartment> apartments) {
+        this.apartments = apartments;
     }
 }
