@@ -1,357 +1,343 @@
 package rest.service.impl;
 
 import bitrix.entity.*;
-import bitrix.entity.param.*;
 import bitrix.repository.HouseRespository;
 import bitrix.repository.IFileRepository;
 import bitrix.repository.IblockRepository;
 import bitrix.repository.ResidentialRepository;
-import bitrix.repository.param.*;
 import nar.NarXMLParser;
 import nar.entity.Apartment;
 import other.DownloadFileFromUrl;
+import rest.entity.HouseCache;
+import rest.entity.ResidentialCache;
+import rest.entity.controller.CustomParameter;
+import rest.entity.controller.DataToFastSelect;
+import rest.entity.controller.ResidentialMin;
+import rest.entity.controller.SearchData;
 import rest.service.ResidentialService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 @Service
 public class ResidentialServiceImpl implements ResidentialService {
+
+    /* Create local cache -- start */
+    private HashMap<String, CustomParameter> cacheParameter = new HashMap<>();
+    private HashMap<Integer, Iblock> cacheIBlock = new HashMap<>();
+    private HashMap<Integer, IFile> cacheIFile = new HashMap<>();
+    private HashMap<Integer, House> cacheHouse = new HashMap<>();
+
+    private String[] paramTables = {"accomplishments", "banks", "comfort", "deadline", "decoration", "developer",
+            "district", "ecologicals", "externals", "internals", "material", "pay", "securities", "subway_station"};
+    private HashMap<Integer, ResidentialCache> cache = new HashMap<>();
+    /* Create local cache -- end */
 
 
     @Autowired
     private ResidentialRepository residentialRepository;
 
-    @Autowired
-    private DistrictRepository districtRepository;
+    @Override
+    public List<ResidentialMin> getResidentialMin() {
+        checkUpdate();
 
-    @Autowired
-    private DeveloperRepository developerRepository;
+        List<ResidentialMin> res = new ArrayList<>();
 
-    @Autowired
-    private SubwayStationRepository subwayStationRepository;
+        for (Map.Entry<Integer, ResidentialCache> item: cache.entrySet()) {
+            res.add(new ResidentialMin(item.getValue()));
+        }
 
-    @Autowired
-    private ComfortRepository comfortRepository;
-
-    @Autowired
-    private ExternalsRepository externalsRepository;
-
-    @Autowired
-    private InternalsRepository internalsRepository;
-
-    @Autowired
-    private EcologicalsRepository ecologicalsRepository;
-
-    @Autowired
-    private SecuritiesRepository securitiesRepository;
-
-    @Autowired
-    private AccomplishmentsRepository accomplishmentsRepository;
-
-    @Autowired
-    private IblockRepository iblockRepository;
-
-    @Autowired
-    private IFileRepository iFileRepository;
-
-    @Autowired
-    private HouseRespository houseRespository;
-
-    @Autowired
-    private DeadlineRepository deadlineRepository;
-
-    @Autowired
-    private DecorationRepository decorationRepository;
-
-    @Autowired
-    private MaterialRepository materialRepository;
-
-    @Autowired
-    private PayRepository payRepository;
-
-    @Autowired
-    private BanksRepository banksRepository;
+        return res;
+    }
 
     @Override
-    public List<ResidentialOut> findAll() {
-        List<District> districtList = districtRepository.findAll();
-        List<Developer> developerList = developerRepository.findAll();
-        List<SubwayStation> subwayStationList = subwayStationRepository.findAll();
-        List<Comfort> comfortList = comfortRepository.findAll();
-        List<Externals> externalsList = externalsRepository.findAll();
-        List<Internals> internalsList = internalsRepository.findAll();
-        List<Ecologicals> ecologicalsList = ecologicalsRepository.findAll();
-        List<Securities> securityList = securitiesRepository.findAll();
-        List<Accomplishments> accomplishmentsList = accomplishmentsRepository.findAll();
-        List<Deadline> deadlineList = deadlineRepository.findAll();
-        List<Decoration> decorationList = decorationRepository.findAll();
-        List<Material> materialList = materialRepository.findAll();
-        List<Pay> payList = payRepository.findAll();
-        List<Banks> banksList = banksRepository.findAll();
+    public List<DataToFastSelect> getAllParam() {
+        checkUpdate();
+
+        List<DataToFastSelect> data = new ArrayList<>();
+        for (HashMap.Entry<String, CustomParameter> entry : cacheParameter.entrySet()) {
+            CustomParameter value = entry.getValue();
+            data.add(new DataToFastSelect(value.getName(), value.getXmlId()));
+        }
+
+        for (Map.Entry<Integer, ResidentialCache> item: cache.entrySet()) {
+            data.add(new DataToFastSelect(item.getValue().getName(), item.getValue().getId().toString()));
+        }
+
+        return data;
+    }
+
+    private void checkUpdate() {
+        if(cacheParameter.isEmpty() || cacheIBlock.isEmpty() || cacheIFile.isEmpty() || cacheHouse.isEmpty() || cache.isEmpty()) {
+            this.updater();
+        }
+    }
+
+    private void updater() {
+        updateIBlock();
+        updateFile();
+        updateHouse();
+
         List<Apartment> apartmentList = null;
 
         String outputFile = System.getProperty("user.dir") + "\\apartment.xml";
-        if(DownloadFileFromUrl.DownloadFileFromUrl("http://mls-nsk.ru/files/newbuilding_export.yml", outputFile)) {
+        if (DownloadFileFromUrl.DownloadFileFromUrl("http://mls-nsk.ru/files/newbuilding_export.yml", outputFile)) {
             apartmentList = NarXMLParser.parsingXmlFile(outputFile);
         }
 
 
         List<Residential> residentialList = residentialRepository.findAll();
-        List<ResidentialOut> residentialOutList = new ArrayList<>();
 
-        for (Residential residential: residentialList) {
-            ResidentialOut residentialOut = new ResidentialOut();
-            residentialOut.setId(residential.getIBLOCK_ELEMENT_ID());
-            residentialOut.setAddress(residential.getPROPERTY_1121());
-            residentialOut.setCoordinates(residential.getPROPERTY_1120());
-            residentialOut.setDistrict(residential.getPROPERTY_1122());
-            residentialOut.setForm1(residential.getPROPERTY_1143());
-            residentialOut.setForm2(residential.getPROPERTY_1144());
+        for (Residential residential : residentialList) {
+            ResidentialCache cacheItem = new ResidentialCache(residential);
 
-            if(residential.getPROPERTY_1122() != null) {
-                for (District district: districtList) {
-                    if(residential.getPROPERTY_1122().equals(district.getXmlId())) {
-                        residentialOut.setDistrict(district.getName());
-                    }
-                }
+            cacheItem.setDistrict(setParam2(residential.getPROPERTY_1122()));
+            if(cacheItem.getDistrict() == null) {
+                System.out.println("Null district, element id: " + cacheItem.getId());
+                continue;
             }
 
-            if(residential.getPROPERTY_1123() != null) {
-                for (Developer developer: developerList) {
-                    if(residential.getPROPERTY_1123().equals(developer.getXmlId())) {
-                        residentialOut.setDeveloper(developer.getName());
-                    }
-                }
+            cacheItem.setDeveloper(setParam2(residential.getPROPERTY_1123()));
+            if(cacheItem.getDeveloper() == null) {
+                System.out.println("Null district, developer id: " + cacheItem.getId());
+                continue;
             }
 
-            if(residential.getPROPERTY_1124() != null) {
-                for (SubwayStation subwayStation: subwayStationList) {
-                    if(residential.getPROPERTY_1124().equals(subwayStation.getXmlId())) {
-                        residentialOut.setSubway(subwayStation.getName());
-                    }
-                }
+            cacheItem.setSubway(setParam2(residential.getPROPERTY_1124()));
+            cacheItem.setComfort(setParam2(residential.getPROPERTY_1129()));
+
+            cacheItem.setExternals(setParam2(residential.getPROPERTY_1130(), "ex"));
+            cacheItem.setInternals(setParam2(residential.getPROPERTY_1131(), "in"));
+            cacheItem.setEcologicals(setParam2(residential.getPROPERTY_1132(), "eg"));
+            cacheItem.setSecurities(setParam2(residential.getPROPERTY_1133(), "sc"));
+            cacheItem.setAccomplishments(setParam2(residential.getPROPERTY_1134(), "ac"));
+
+            // Пропуск не активных ЖК
+            if(cacheIBlock.get(cacheItem.getId()) == null) {
+                continue;
             }
 
-            residentialOut.setSubwayMin(residential.getPROPERTY_1125());
-            residentialOut.setBus(residential.getPROPERTY_1126());
-            residentialOut.setBusMin(residential.getPROPERTY_1127());
-            residentialOut.setParking(residential.getPROPERTY_1128());
+            cacheItem.setDetailText(cacheIBlock.get(cacheItem.getId()).getDetailText());
+            cacheItem.setPreviewText(cacheIBlock.get(cacheItem.getId()).getPreviewText());
+            cacheItem.setName(cacheIBlock.get(cacheItem.getId()).getName());
+            cacheItem.setImage(cacheIFile.get(cacheIBlock.get(cacheItem.getId()).getPreviewPicture()));
+            cacheItem.setImageBig(cacheIFile.get(cacheIBlock.get(cacheItem.getId()).getDetailPicture()));
 
-            if(residential.getPROPERTY_1129() != null) {
-                for (Comfort comfort: comfortList) {
-                    if(residential.getPROPERTY_1129().equals(comfort.getXmlId())) {
-                        residentialOut.setComfort(comfort.getName());
-                    }
-                }
+            List<HouseCache> houses = new ArrayList<>();
+            for (Map.Entry<Integer, House> house: cacheHouse.entrySet()) {
+                if(!house.getValue().getPROPERTY_1135().equals(cacheItem.getId())) continue;
+
+                HouseCache houseOut = new HouseCache(house.getValue());
+                houseOut.setDeadline(setParam2(house.getValue().getPROPERTY_1138()));
+                houseOut.setDecoration(setParam2(house.getValue().getPROPERTY_1139()));
+                houseOut.setMaterial(setParam2(house.getValue().getPROPERTY_1140()));
+                houseOut.setPayment(setParam2(house.getValue().getPROPERTY_1141(), "pa"));
+                houseOut.setBank(setParam2(house.getValue().getPROPERTY_1142(), "bk"));
+
+
+
+//                List<Apartment> apartmentsByDeveloper = apartmentList.stream()
+//                        .filter(item -> item.getDeveloper().equals(residentialOut.getName()))
+//                        .collect(Collectors.toList());
+////
+//                houseOut.setApartments(apartmentsByDeveloper.stream()
+//                        .filter(item -> item.getAddress().equals(houseOut.getName()))
+//                        .collect(Collectors.toList())
+//                );
+
+                houses.add(houseOut);
             }
 
-            if(residential.getPROPERTY_1130() != null) {
-                Pattern p = Pattern.compile("ex(\\d*)");
-                Matcher m = p.matcher(residential.getPROPERTY_1130());
+            cacheItem.setHouses(houses);
 
-                List<String> test = new ArrayList<>();
-                while(m.find()) {
-                    for (Externals externals: externalsList) {
-                        if(residential.getPROPERTY_1130().substring(m.start(), m.end()).equals(externals.getXmlId())) {
-                            test.add(externals.getName());
-                        }
-                    }
-                }
-
-                residentialOut.setExternals(test);
-            }
-
-            if(residential.getPROPERTY_1131() != null) {
-                Pattern p = Pattern.compile("in(\\d*)");
-                Matcher m = p.matcher(residential.getPROPERTY_1131());
-
-                List<String> test = new ArrayList<>();
-                while(m.find()) {
-                    for (Internals internals: internalsList) {
-                        if(residential.getPROPERTY_1131().substring(m.start(), m.end()).equals(internals.getXmlId())) {
-                            test.add(internals.getName());
-                        }
-                    }
-                }
-
-                residentialOut.setInternals(test);
-            }
-
-            if(residential.getPROPERTY_1132() != null) {
-                Pattern p = Pattern.compile("eg(\\d*)");
-                Matcher m = p.matcher(residential.getPROPERTY_1132());
-
-                List<String> test = new ArrayList<>();
-                while(m.find()) {
-                    for (Ecologicals ecologicals: ecologicalsList) {
-                        if(residential.getPROPERTY_1132().substring(m.start(), m.end()).equals(ecologicals.getXmlId())) {
-                            test.add(ecologicals.getName());
-                        }
-                    }
-                }
-
-                residentialOut.setEcologicals(test);
-            }
-
-            if(residential.getPROPERTY_1133() != null) {
-                Pattern p = Pattern.compile("sc(\\d*)");
-                Matcher m = p.matcher(residential.getPROPERTY_1133());
-
-                List<String> test = new ArrayList<>();
-                while(m.find()) {
-                    for (Securities securities: securityList) {
-                        if(residential.getPROPERTY_1133().substring(m.start(), m.end()).equals(securities.getXmlId())) {
-                            test.add(securities.getName());
-                        }
-                    }
-                }
-
-                residentialOut.setSecurities(test);
-            }
-
-            if(residential.getPROPERTY_1134() != null) {
-                Pattern p = Pattern.compile("ac(\\d*)");
-                Matcher m = p.matcher(residential.getPROPERTY_1134());
-
-                List<String> test = new ArrayList<>();
-                while(m.find()) {
-                    for (Accomplishments accomplishments: accomplishmentsList) {
-                        if(residential.getPROPERTY_1134().substring(m.start(), m.end()).equals(accomplishments.getXmlId())) {
-                            test.add(accomplishments.getName());
-                        }
-                    }
-                }
-
-                residentialOut.setAccomplishments(test);
-            }
-
-            Iblock iblock = iblockRepository.findOne(residentialOut.getId());
-            if(iblock != null) {
-                if(iblock.getActive().equals("N")) {
-                    continue;
-                }
-                residentialOut.setDetailText(iblock.getDetailText());
-                residentialOut.setPreviewText(iblock.getPreviewText());
-                residentialOut.setName(iblock.getName());
-                if(iblock.getPreviewPicture() != null) {
-                    IFile iFile1 = iFileRepository.findOne(iblock.getPreviewPicture());
-                    if (iFile1 != null) {
-                        residentialOut.setImage(iFile1.getSubdir() + "/" + iFile1.getName());
-                    }
-                }
-
-                if(iblock.getDetailPicture() != null) {
-                    IFile iFile2 = iFileRepository.findOne(iblock.getDetailPicture());
-                    if (iFile2 != null) {
-                        residentialOut.setImageBig(iFile2.getSubdir() + "/" + iFile2.getName());
-                    }
-                }
-            }
-
-
-            List<House> houseList = houseRespository.findDeadline(residentialOut.getId());
-            if(houseList != null && houseList.size() > 0) {
-                for (Deadline deadline: deadlineList) {
-                        if(houseList.get(0).getPROPERTY_1138().equals(deadline.getXmlId())) {
-                            if(deadline.getName() != null) {
-                                residentialOut.setDeadlin(deadline.getName());
-                            }
-                        }
-                }
-            }
-
-            houseList = houseRespository.findFloor(residentialOut.getId());
-            if(houseList != null && houseList.size() > 0) {
-                if(houseList.get(0).getPROPERTY_1137() != null && houseList.get(0).getPROPERTY_1137() > 0) {
-                    residentialOut.setFloor(houseList.get(0).getPROPERTY_1137());
-                }
-            }
-
-            List<HouseOut> houseOutList = new ArrayList<>();
-            for (House house: houseList) {
-                HouseOut houseOut = new HouseOut();
-                houseOut.setId(house.getId());
-                houseOut.setName(house.getPROPERTY_1136());
-                houseOut.setFloor(house.getPROPERTY_1137());
-                for (Deadline deadline: deadlineList) {
-                    if(house.getPROPERTY_1138().equals(deadline.getXmlId())) {
-                        if(deadline.getName() != null) {
-                            houseOut.setDeadline(deadline.getName());
-                        }
-                    }
-                }
-                for (Decoration decoration: decorationList) {
-                    if(house.getPROPERTY_1139().equals(decoration.getXmlId())) {
-                        if(decoration.getName() != null) {
-                            houseOut.setDecoration(decoration.getName());
-                        }
-                    }
-                }
-                for (Material material: materialList) {
-                    if(house.getPROPERTY_1140() != null && material.getXmlId() != null) {
-                        if(house.getPROPERTY_1140().equals(material.getXmlId())) {
-                            if(material.getName() != null) {
-                                houseOut.setMaterial(material.getName());
-                            }
-                        }
-                    }
-                }
-
-                if(house.getPROPERTY_1141() != null) {
-                    Pattern p = Pattern.compile("pa(\\d*)");
-                    Matcher m = p.matcher(house.getPROPERTY_1141());
-
-                    List<String> test = new ArrayList<>();
-                    while(m.find()) {
-                        for (Pay pay: payList) {
-                            if(house.getPROPERTY_1141().substring(m.start(), m.end()).equals(pay.getXmlId())) {
-                                test.add(pay.getName());
-                            }
-                        }
-                    }
-
-                    houseOut.setPayment(test);
-                }
-
-                if(house.getPROPERTY_1142() != null) {
-                    Pattern p = Pattern.compile("bk(\\d*)");
-                    Matcher m = p.matcher(house.getPROPERTY_1142());
-
-                    List<String> test = new ArrayList<>();
-                    while(m.find()) {
-                        for (Banks banks: banksList) {
-                            if(house.getPROPERTY_1142().substring(m.start(), m.end()).equals(banks.getXmlId())) {
-                                test.add(banks.getName());
-                            }
-                        }
-                    }
-
-                    houseOut.setBank(test);
-                }
-
-                List<Apartment> apartmentsByDeveloper = apartmentList.stream()
-                        .filter(item -> item.getDeveloper().equals(residentialOut.getName()))
-                        .collect(Collectors.toList());
-
-                houseOut.setApartments(apartmentsByDeveloper.stream()
-                        .filter(item -> item.getAddress().equals(houseOut.getName()))
-                        .collect(Collectors.toList())
-                );
-
-                houseOutList.add(houseOut);
-            }
-
-            residentialOut.setHouses(houseOutList);
-
-            residentialOutList.add(residentialOut);
+            cache.put(cacheItem.getId(), cacheItem);
         }
 
-        return residentialOutList;
     }
+
+    @Override
+    public List<ResidentialMin> getResidentialMinBySearch(SearchData[] searchData) {
+        checkUpdate();
+
+        return null;
+    }
+
+    @Override
+    public List<ResidentialCache> findAll() {
+        checkUpdate();
+
+        List<ResidentialCache> residentialCaches = new ArrayList<>();
+        for(Map.Entry<Integer, ResidentialCache> item: cache.entrySet()) {
+            residentialCaches.add(item.getValue());
+        }
+
+        return residentialCaches;
+    }
+
+    private String setParam(String xmlId) {
+        if (cacheParameter.size() == 0) {
+            updateParameters();
+        }
+
+        if (xmlId == null) {
+            return null;
+        }
+
+        if (xmlId.isEmpty()) {
+            return null;
+        }
+
+        return cacheParameter.get(xmlId).getName();
+    }
+
+    private CustomParameter setParam2(String xmlId) {
+        if (cacheParameter.size() == 0) {
+            updateParameters();
+        }
+
+        return cacheParameter.get(xmlId);
+    }
+
+    private List<CustomParameter> setParam2(String param, String pattern) {
+        if (param == null) return null;
+        if (param.isEmpty()) return null;
+        Pattern p = Pattern.compile(pattern + "(\\d*)");
+        Matcher m = p.matcher(param);
+
+        List<CustomParameter> res = new ArrayList<>();
+        while (m.find()) {
+            res.add(setParam2(param.substring(m.start(), m.end())));
+        }
+
+        return res;
+    }
+
+    private void updateParameters() {
+        try {
+            String url = "jdbc:mysql://mdn1.timeweb.ru:3306/bgnsk_newbgnsk?characterEncoding=UTF-8";
+            Connection conn = DriverManager.getConnection(url, "bgnsk_newbgnsk", "3FM82BlmwL4uxd9jyiku");
+            Statement stmt = conn.createStatement();
+
+
+            for (String table : paramTables) {
+                ResultSet rs;
+                rs = stmt.executeQuery("SELECT ID, UF_NAME, UF_XML_ID FROM " + table);
+                while (rs.next()) {
+                    Integer id = rs.getInt("ID");
+                    String uf_name = rs.getString("UF_NAME");
+                    String uf_xml_id = rs.getString("UF_XML_ID");
+
+                    if (uf_xml_id == null) continue;
+                    if (uf_xml_id.isEmpty()) continue;
+
+                    cacheParameter.put(uf_xml_id, new CustomParameter(id, uf_name, uf_xml_id));
+                }
+            }
+
+            conn.close();
+
+        } catch (Exception e) {
+            System.err.println("updateParameters error! ");
+            System.err.println(e.getMessage());
+        }
+    }
+
+    private void updateIBlock() {
+        try {
+            String url = "jdbc:mysql://mdn1.timeweb.ru:3306/bgnsk_newbgnsk?characterEncoding=UTF-8";
+            Connection conn = DriverManager.getConnection(url, "bgnsk_newbgnsk", "3FM82BlmwL4uxd9jyiku");
+            Statement stmt = conn.createStatement();
+
+
+            ResultSet rs;
+            rs = stmt.executeQuery("SELECT * FROM b_iblock_element WHERE IBLOCK_ID = 79 AND active = 'Y'");
+            while (rs.next()) {
+                Iblock iblock = new Iblock();
+                iblock.setId(rs.getInt("ID"));
+                iblock.setActive(rs.getString("ACTIVE"));
+                iblock.setName(rs.getString("NAME"));
+                iblock.setPreviewPicture(rs.getInt("PREVIEW_PICTURE"));
+                iblock.setPreviewText(rs.getString("PREVIEW_TEXT"));
+                iblock.setDetailPicture(rs.getInt("DETAIL_PICTURE"));
+                iblock.setDetailText(rs.getString("DETAIL_TEXT"));
+
+                cacheIBlock.put(iblock.getId(), iblock);
+            }
+
+            conn.close();
+
+        } catch (Exception e) {
+            System.err.println("updateParameters error! ");
+            System.err.println(e.getMessage());
+        }
+    }
+
+    private void updateFile() {
+        try {
+            String url = "jdbc:mysql://mdn1.timeweb.ru:3306/bgnsk_newbgnsk?characterEncoding=UTF-8";
+            Connection conn = DriverManager.getConnection(url, "bgnsk_newbgnsk", "3FM82BlmwL4uxd9jyiku");
+            Statement stmt = conn.createStatement();
+
+
+            ResultSet rs;
+            rs = stmt.executeQuery("SELECT ID, SUBDIR, FILE_NAME FROM b_file");
+            while (rs.next()) {
+                IFile iFile = new IFile();
+                iFile.setId(rs.getInt("ID"));
+                iFile.setName(rs.getString("FILE_NAME"));
+                iFile.setSubdir(rs.getString("SUBDIR"));
+
+                cacheIFile.put(iFile.getId(), iFile);
+            }
+
+            conn.close();
+
+        } catch (Exception e) {
+            System.err.println("updateParameters error! ");
+            System.err.println(e.getMessage());
+        }
+    }
+
+    private void updateHouse() {
+        try {
+            String url = "jdbc:mysql://mdn1.timeweb.ru:3306/bgnsk_newbgnsk?characterEncoding=UTF-8";
+            Connection conn = DriverManager.getConnection(url, "bgnsk_newbgnsk", "3FM82BlmwL4uxd9jyiku");
+            Statement stmt = conn.createStatement();
+
+
+            ResultSet rs;
+            rs = stmt.executeQuery("SELECT * FROM b_iblock_element_prop_s80;");
+            while (rs.next()) {
+                House house = new House();
+                house.setId(rs.getInt("IBLOCK_ELEMENT_ID"));
+                house.setPROPERTY_1135(rs.getInt("PROPERTY_1135"));
+                house.setPROPERTY_1136(rs.getString("PROPERTY_1136"));
+                house.setPROPERTY_1137(rs.getInt("PROPERTY_1137"));
+                house.setPROPERTY_1138(rs.getString("PROPERTY_1138"));
+                house.setPROPERTY_1139(rs.getString("PROPERTY_1139"));
+                house.setPROPERTY_1140(rs.getString("PROPERTY_1140"));
+                house.setPROPERTY_1141(rs.getString("PROPERTY_1141"));
+                house.setPROPERTY_1142(rs.getString("PROPERTY_1142"));
+
+                cacheHouse.put(house.getId(), house);
+            }
+
+            conn.close();
+
+        } catch (Exception e) {
+            System.err.println("updateParameters error! ");
+            System.err.println(e.getMessage());
+        }
+    }
+
 }
