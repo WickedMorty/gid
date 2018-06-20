@@ -29,7 +29,7 @@ public class ResidentialOut {
     private String form2;
     private List<HouseOut> houses;
 
-    private String deadlin;
+    private String deadline;
     private Integer floor;
 
     public ResidentialOut() {
@@ -187,12 +187,12 @@ public class ResidentialOut {
         this.imageBig = imageBig;
     }
 
-    public String getDeadlin() {
-        return deadlin;
+    public String getDeadline() {
+        return deadline;
     }
 
-    public void setDeadlin(String deadlin) {
-        this.deadlin = deadlin;
+    public void setDeadline(String deadlin) {
+        this.deadline = deadlin;
     }
 
     public String getPreviewText() {
@@ -314,8 +314,8 @@ public class ResidentialOut {
             }
         }
 
-        if(deadlin != null) {
-            if (deadlin.toLowerCase().contains(searchString)) {
+        if(deadline != null) {
+            if (deadline.toLowerCase().contains(searchString)) {
                 return true;
             }
         }

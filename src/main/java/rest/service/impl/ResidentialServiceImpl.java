@@ -1,9 +1,6 @@
 package rest.service.impl;
 
 import bitrix.entity.*;
-import bitrix.repository.HouseRespository;
-import bitrix.repository.IFileRepository;
-import bitrix.repository.IblockRepository;
 import bitrix.repository.ResidentialRepository;
 import nar.NarXMLParser;
 import nar.entity.Apartment;
@@ -18,14 +15,8 @@ import rest.service.ResidentialService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.ResultSet;
-import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.sql.*;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -37,6 +28,7 @@ public class ResidentialServiceImpl implements ResidentialService {
     private HashMap<Integer, Iblock> cacheIBlock = new HashMap<>();
     private HashMap<Integer, IFile> cacheIFile = new HashMap<>();
     private HashMap<Integer, House> cacheHouse = new HashMap<>();
+    private List<String> error = new ArrayList<>();
 
     private String[] paramTables = {"accomplishments", "banks", "comfort", "deadline", "decoration", "developer",
             "district", "ecologicals", "externals", "internals", "material", "pay", "securities", "subway_station"};
@@ -53,7 +45,7 @@ public class ResidentialServiceImpl implements ResidentialService {
 
         List<ResidentialMin> res = new ArrayList<>();
 
-        for (Map.Entry<Integer, ResidentialCache> item: cache.entrySet()) {
+        for (Map.Entry<Integer, ResidentialCache> item : cache.entrySet()) {
             res.add(new ResidentialMin(item.getValue()));
         }
 
@@ -70,7 +62,7 @@ public class ResidentialServiceImpl implements ResidentialService {
             data.add(new DataToFastSelect(value.getName(), value.getXmlId()));
         }
 
-        for (Map.Entry<Integer, ResidentialCache> item: cache.entrySet()) {
+        for (Map.Entry<Integer, ResidentialCache> item : cache.entrySet()) {
             data.add(new DataToFastSelect(item.getValue().getName(), item.getValue().getId().toString()));
         }
 
@@ -78,22 +70,20 @@ public class ResidentialServiceImpl implements ResidentialService {
     }
 
     private void checkUpdate() {
-        if(cacheParameter.isEmpty() || cacheIBlock.isEmpty() || cacheIFile.isEmpty() || cacheHouse.isEmpty() || cache.isEmpty()) {
+        if (cacheParameter.isEmpty() || cacheIBlock.isEmpty() || cacheIFile.isEmpty() || cacheHouse.isEmpty() || cache.isEmpty()) {
             this.updater();
         }
     }
 
     private void updater() {
-        updateIBlock();
-        updateFile();
-        updateHouse();
+        updateParameters();
 
-        List<Apartment> apartmentList = null;
-
-        String outputFile = System.getProperty("user.dir") + "\\apartment.xml";
-        if (DownloadFileFromUrl.DownloadFileFromUrl("http://mls-nsk.ru/files/newbuilding_export.yml", outputFile)) {
-            apartmentList = NarXMLParser.parsingXmlFile(outputFile);
-        }
+//        List<Apartment> apartmentList = null;
+//
+//        String outputFile = System.getProperty("user.dir") + "\\apartment.xml";
+//        if (DownloadFileFromUrl.DownloadFileFromUrl("http://mls-nsk.ru/files/newbuilding_export.yml", outputFile)) {
+//            apartmentList = NarXMLParser.parsingXmlFile(outputFile);
+//        }
 
 
         List<Residential> residentialList = residentialRepository.findAll();
@@ -101,29 +91,29 @@ public class ResidentialServiceImpl implements ResidentialService {
         for (Residential residential : residentialList) {
             ResidentialCache cacheItem = new ResidentialCache(residential);
 
-            cacheItem.setDistrict(setParam2(residential.getPROPERTY_1122()));
-            if(cacheItem.getDistrict() == null) {
-                System.out.println("Null district, element id: " + cacheItem.getId());
+            cacheItem.setDistrict(setParam(residential.getPROPERTY_1122()));
+            if (cacheItem.getDistrict() == null) {
+                error.add("Null district, element id: " + cacheItem.getId());
                 continue;
             }
 
-            cacheItem.setDeveloper(setParam2(residential.getPROPERTY_1123()));
-            if(cacheItem.getDeveloper() == null) {
-                System.out.println("Null district, developer id: " + cacheItem.getId());
+            cacheItem.setDeveloper(setParam(residential.getPROPERTY_1123()));
+            if (cacheItem.getDeveloper() == null) {
+                error.add("Null district, developer id: " + cacheItem.getId());
                 continue;
             }
 
-            cacheItem.setSubway(setParam2(residential.getPROPERTY_1124()));
-            cacheItem.setComfort(setParam2(residential.getPROPERTY_1129()));
+            cacheItem.setSubway(setParam(residential.getPROPERTY_1124()));
+            cacheItem.setComfort(setParam(residential.getPROPERTY_1129()));
 
-            cacheItem.setExternals(setParam2(residential.getPROPERTY_1130(), "ex"));
-            cacheItem.setInternals(setParam2(residential.getPROPERTY_1131(), "in"));
-            cacheItem.setEcologicals(setParam2(residential.getPROPERTY_1132(), "eg"));
-            cacheItem.setSecurities(setParam2(residential.getPROPERTY_1133(), "sc"));
-            cacheItem.setAccomplishments(setParam2(residential.getPROPERTY_1134(), "ac"));
+            cacheItem.setExternals(setParam(residential.getPROPERTY_1130(), "ex"));
+            cacheItem.setInternals(setParam(residential.getPROPERTY_1131(), "in"));
+            cacheItem.setEcologicals(setParam(residential.getPROPERTY_1132(), "eg"));
+            cacheItem.setSecurities(setParam(residential.getPROPERTY_1133(), "sc"));
+            cacheItem.setAccomplishments(setParam(residential.getPROPERTY_1134(), "ac"));
 
             // Пропуск не активных ЖК
-            if(cacheIBlock.get(cacheItem.getId()) == null) {
+            if (cacheIBlock.get(cacheItem.getId()) == null) {
                 continue;
             }
 
@@ -134,16 +124,15 @@ public class ResidentialServiceImpl implements ResidentialService {
             cacheItem.setImageBig(cacheIFile.get(cacheIBlock.get(cacheItem.getId()).getDetailPicture()));
 
             List<HouseCache> houses = new ArrayList<>();
-            for (Map.Entry<Integer, House> house: cacheHouse.entrySet()) {
-                if(!house.getValue().getPROPERTY_1135().equals(cacheItem.getId())) continue;
+            for (Map.Entry<Integer, House> house : cacheHouse.entrySet()) {
+                if (!house.getValue().getPROPERTY_1135().equals(cacheItem.getId())) continue;
 
                 HouseCache houseOut = new HouseCache(house.getValue());
-                houseOut.setDeadline(setParam2(house.getValue().getPROPERTY_1138()));
-                houseOut.setDecoration(setParam2(house.getValue().getPROPERTY_1139()));
-                houseOut.setMaterial(setParam2(house.getValue().getPROPERTY_1140()));
-                houseOut.setPayment(setParam2(house.getValue().getPROPERTY_1141(), "pa"));
-                houseOut.setBank(setParam2(house.getValue().getPROPERTY_1142(), "bk"));
-
+                houseOut.setDeadline(setParam(house.getValue().getPROPERTY_1138()));
+                houseOut.setDecoration(setParam(house.getValue().getPROPERTY_1139()));
+                houseOut.setMaterial(setParam(house.getValue().getPROPERTY_1140()));
+                houseOut.setPayment(setParam(house.getValue().getPROPERTY_1141(), "pa"));
+                houseOut.setBank(setParam(house.getValue().getPROPERTY_1142(), "bk"));
 
 
 //                List<Apartment> apartmentsByDeveloper = apartmentList.stream()
@@ -165,11 +154,233 @@ public class ResidentialServiceImpl implements ResidentialService {
 
     }
 
+    private List<String> filterSearchData(SearchData[] searchData, String pattern) {
+        List<String> list = new ArrayList<>();
+
+        for (SearchData sd : searchData) {
+            if (sd.getValue().contains(pattern)) {
+                list.add(sd.getValue());
+            }
+        }
+
+        return list;
+    }
+
+    private List<Integer> filterSearchData(SearchData[] searchData) {
+        List<Integer> list = new ArrayList<>();
+
+        for (SearchData sd : searchData) {
+            if (sd.getValue().matches("[0-9]+")) {
+                list.add(Integer.valueOf(sd.getValue()));
+            }
+        }
+
+        return list;
+    }
+
+    private List<ResidentialCache> unionList(List<ResidentialCache> result, Set<ResidentialCache> l2) {
+
+        if (result.isEmpty()) return null;
+
+        List<ResidentialCache> l2List = new ArrayList<>();
+        for(ResidentialCache item: l2) {
+            l2List.add(item);
+        }
+
+        if (l2List.isEmpty()) return result;
+
+        List<ResidentialCache> res = new ArrayList<>();
+
+        HashMap<Integer, ResidentialCache> l1hm = new HashMap<>();
+        for (ResidentialCache rc : result) {
+            l1hm.put(rc.getId(), rc);
+        }
+
+        for(ResidentialCache rc: l2List) {
+            if(rc.equals(l1hm.get(rc.getId()))) {
+                res.add(rc);
+            }
+        }
+
+        return res;
+    }
+
     @Override
     public List<ResidentialMin> getResidentialMinBySearch(SearchData[] searchData) {
         checkUpdate();
 
-        return null;
+        List<ResidentialCache> res = new ArrayList<>();
+
+        for(Map.Entry<Integer, ResidentialCache> entry: cache.entrySet()) {
+            res.add(entry.getValue());
+        }
+
+        Set<ResidentialCache> residential = new LinkedHashSet<>();
+        Set<ResidentialCache> accomplishments = new LinkedHashSet<>();
+        Set<ResidentialCache> banks = new LinkedHashSet<>();
+        Set<ResidentialCache> pay = new LinkedHashSet<>();
+        Set<ResidentialCache> externals = new LinkedHashSet<>();
+        Set<ResidentialCache> internals = new LinkedHashSet<>();
+        Set<ResidentialCache> ecologicals = new LinkedHashSet<>();
+        Set<ResidentialCache> securities = new LinkedHashSet<>();
+        Set<ResidentialCache> comfort = new LinkedHashSet<>();
+        Set<ResidentialCache> deadline = new LinkedHashSet<>();
+        Set<ResidentialCache> decoration = new LinkedHashSet<>();
+        Set<ResidentialCache> developer = new LinkedHashSet<>();
+        Set<ResidentialCache> district = new LinkedHashSet<>();
+        Set<ResidentialCache> material = new LinkedHashSet<>();
+        Set<ResidentialCache> subway_station = new LinkedHashSet<>();
+
+        for (Integer id : filterSearchData(searchData)) {
+            residential.add(cache.get(id));
+        }
+        res = unionList(res, residential);
+        for (String item : filterSearchData(searchData, "su")) {
+            for (Map.Entry<Integer, ResidentialCache> rc : cache.entrySet()) {
+                if (rc.getValue().getSubway().getXmlId().equals(item)) {
+                    subway_station.add(rc.getValue());
+                }
+            }
+        }
+        res = unionList(res, subway_station);
+        for (String item : filterSearchData(searchData, "dt")) {
+            for (Map.Entry<Integer, ResidentialCache> rc : cache.entrySet()) {
+                if (rc.getValue().getDistrict().getXmlId().equals(item)) {
+                    district.add(rc.getValue());
+                }
+            }
+        }
+        res = unionList(res, district);
+        for (String item : filterSearchData(searchData, "dv")) {
+            for (Map.Entry<Integer, ResidentialCache> rc : cache.entrySet()) {
+                if (rc.getValue().getDeveloper().getXmlId().equals(item)) {
+                    developer.add(rc.getValue());
+                }
+            }
+        }
+        res = unionList(res, developer);
+        for (String item : filterSearchData(searchData, "cf")) {
+            for (Map.Entry<Integer, ResidentialCache> rc : cache.entrySet()) {
+                if (rc.getValue().getComfort().getXmlId().equals(item)) {
+                    comfort.add(rc.getValue());
+                }
+            }
+        }
+        res = unionList(res, comfort);
+        for (String item : filterSearchData(searchData, "sc")) {
+            for (Map.Entry<Integer, ResidentialCache> rc : cache.entrySet()) {
+                for (CustomParameter cp : rc.getValue().getSecurities()) {
+                    if (cp.getXmlId().equals(item)) {
+                        securities.add(rc.getValue());
+                    }
+                }
+            }
+        }
+        res = unionList(res, securities);
+        for (String item : filterSearchData(searchData, "eg")) {
+            for (Map.Entry<Integer, ResidentialCache> rc : cache.entrySet()) {
+                for (CustomParameter cp : rc.getValue().getEcologicals()) {
+                    if (cp.getXmlId().equals(item)) {
+                        ecologicals.add(rc.getValue());
+                    }
+                }
+            }
+        }
+        res = unionList(res, ecologicals);
+        for (String item : filterSearchData(searchData, "in")) {
+            for (Map.Entry<Integer, ResidentialCache> rc : cache.entrySet()) {
+                for (CustomParameter cp : rc.getValue().getInternals()) {
+                    if (cp.getXmlId().equals(item)) {
+                        internals.add(rc.getValue());
+                    }
+                }
+            }
+        }
+        res = unionList(res, internals);
+        for (String item : filterSearchData(searchData, "ex")) {
+            for (Map.Entry<Integer, ResidentialCache> rc : cache.entrySet()) {
+                for (CustomParameter cp : rc.getValue().getExternals()) {
+                    if (cp.getXmlId().equals(item)) {
+                        externals.add(rc.getValue());
+                    }
+                }
+            }
+        }
+        res = unionList(res, externals);
+        for (String item : filterSearchData(searchData, "ac")) {
+            for (Map.Entry<Integer, ResidentialCache> rc : cache.entrySet()) {
+                for (CustomParameter cp : rc.getValue().getAccomplishments()) {
+                    if (cp.getXmlId().equals(item)) {
+                        accomplishments.add(rc.getValue());
+                    }
+                }
+            }
+        }
+        res = unionList(res, accomplishments);
+        for (String item : filterSearchData(searchData, "bk")) {
+            for (Map.Entry<Integer, ResidentialCache> rc : cache.entrySet()) {
+                for (HouseCache cp : rc.getValue().getHouses()) {
+                    if(cp.getBank() != null) {
+                        for (CustomParameter cp2 : cp.getBank()) {
+                            if (cp2.getXmlId().equals(item)) {
+                                banks.add(rc.getValue());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        res = unionList(res, banks);
+        for (String item : filterSearchData(searchData, "pa")) {
+            for (Map.Entry<Integer, ResidentialCache> rc : cache.entrySet()) {
+                for (HouseCache cp : rc.getValue().getHouses()) {
+                    for (CustomParameter cp2 : cp.getPayment()) {
+                        if (cp2.getXmlId().equals(item)) {
+                            pay.add(rc.getValue());
+                        }
+                    }
+                }
+            }
+        }
+        res = unionList(res, pay);
+        for (String item : filterSearchData(searchData, "dl")) {
+            for (Map.Entry<Integer, ResidentialCache> rc : cache.entrySet()) {
+                for (HouseCache cp : rc.getValue().getHouses()) {
+                    if (cp.getDeadline().getXmlId().equals(item)) {
+                        deadline.add(rc.getValue());
+                    }
+                }
+            }
+        }
+        res = unionList(res, deadline);
+        for (String item : filterSearchData(searchData, "dc")) {
+            for (Map.Entry<Integer, ResidentialCache> rc : cache.entrySet()) {
+                for (HouseCache cp : rc.getValue().getHouses()) {
+                    if (cp.getDecoration().getXmlId().equals(item)) {
+                        decoration.add(rc.getValue());
+                    }
+                }
+            }
+        }
+        res = unionList(res, decoration);
+        for (String item : filterSearchData(searchData, "mt")) {
+            for (Map.Entry<Integer, ResidentialCache> rc : cache.entrySet()) {
+                for (HouseCache cp : rc.getValue().getHouses()) {
+                    if (cp.getMaterial().getXmlId().equals(item)) {
+                        material.add(rc.getValue());
+                    }
+                }
+            }
+        }
+        res = unionList(res, material);
+
+        List<ResidentialMin> endRes = new ArrayList<>();
+        for(ResidentialCache rc: res) {
+            endRes.add(new ResidentialMin(rc));
+        }
+
+
+        return endRes;
     }
 
     @Override
@@ -177,30 +388,14 @@ public class ResidentialServiceImpl implements ResidentialService {
         checkUpdate();
 
         List<ResidentialCache> residentialCaches = new ArrayList<>();
-        for(Map.Entry<Integer, ResidentialCache> item: cache.entrySet()) {
+        for (Map.Entry<Integer, ResidentialCache> item : cache.entrySet()) {
             residentialCaches.add(item.getValue());
         }
 
         return residentialCaches;
     }
 
-    private String setParam(String xmlId) {
-        if (cacheParameter.size() == 0) {
-            updateParameters();
-        }
-
-        if (xmlId == null) {
-            return null;
-        }
-
-        if (xmlId.isEmpty()) {
-            return null;
-        }
-
-        return cacheParameter.get(xmlId).getName();
-    }
-
-    private CustomParameter setParam2(String xmlId) {
+    private CustomParameter setParam(String xmlId) {
         if (cacheParameter.size() == 0) {
             updateParameters();
         }
@@ -208,7 +403,7 @@ public class ResidentialServiceImpl implements ResidentialService {
         return cacheParameter.get(xmlId);
     }
 
-    private List<CustomParameter> setParam2(String param, String pattern) {
+    private List<CustomParameter> setParam(String param, String pattern) {
         if (param == null) return null;
         if (param.isEmpty()) return null;
         Pattern p = Pattern.compile(pattern + "(\\d*)");
@@ -216,7 +411,7 @@ public class ResidentialServiceImpl implements ResidentialService {
 
         List<CustomParameter> res = new ArrayList<>();
         while (m.find()) {
-            res.add(setParam2(param.substring(m.start(), m.end())));
+            res.add(setParam(param.substring(m.start(), m.end())));
         }
 
         return res;
@@ -224,13 +419,13 @@ public class ResidentialServiceImpl implements ResidentialService {
 
     private void updateParameters() {
         try {
-            String url = "jdbc:mysql://mdn1.timeweb.ru:3306/bgnsk_newbgnsk?characterEncoding=UTF-8";
+            String url = "jdbc:mysql://mdn1.timeweb.ru:3306/bgnsk_newbgnsk?characterEncoding=UTF-8&autoReconnect=true";
             Connection conn = DriverManager.getConnection(url, "bgnsk_newbgnsk", "3FM82BlmwL4uxd9jyiku");
             Statement stmt = conn.createStatement();
 
-
+            /* updateParameters */
+            ResultSet rs;
             for (String table : paramTables) {
-                ResultSet rs;
                 rs = stmt.executeQuery("SELECT ID, UF_NAME, UF_XML_ID FROM " + table);
                 while (rs.next()) {
                     Integer id = rs.getInt("ID");
@@ -244,22 +439,7 @@ public class ResidentialServiceImpl implements ResidentialService {
                 }
             }
 
-            conn.close();
-
-        } catch (Exception e) {
-            System.err.println("updateParameters error! ");
-            System.err.println(e.getMessage());
-        }
-    }
-
-    private void updateIBlock() {
-        try {
-            String url = "jdbc:mysql://mdn1.timeweb.ru:3306/bgnsk_newbgnsk?characterEncoding=UTF-8";
-            Connection conn = DriverManager.getConnection(url, "bgnsk_newbgnsk", "3FM82BlmwL4uxd9jyiku");
-            Statement stmt = conn.createStatement();
-
-
-            ResultSet rs;
+            /*updateIBlock*/
             rs = stmt.executeQuery("SELECT * FROM b_iblock_element WHERE IBLOCK_ID = 79 AND active = 'Y'");
             while (rs.next()) {
                 Iblock iblock = new Iblock();
@@ -274,22 +454,7 @@ public class ResidentialServiceImpl implements ResidentialService {
                 cacheIBlock.put(iblock.getId(), iblock);
             }
 
-            conn.close();
-
-        } catch (Exception e) {
-            System.err.println("updateParameters error! ");
-            System.err.println(e.getMessage());
-        }
-    }
-
-    private void updateFile() {
-        try {
-            String url = "jdbc:mysql://mdn1.timeweb.ru:3306/bgnsk_newbgnsk?characterEncoding=UTF-8";
-            Connection conn = DriverManager.getConnection(url, "bgnsk_newbgnsk", "3FM82BlmwL4uxd9jyiku");
-            Statement stmt = conn.createStatement();
-
-
-            ResultSet rs;
+            /* updateFile */
             rs = stmt.executeQuery("SELECT ID, SUBDIR, FILE_NAME FROM b_file");
             while (rs.next()) {
                 IFile iFile = new IFile();
@@ -300,22 +465,7 @@ public class ResidentialServiceImpl implements ResidentialService {
                 cacheIFile.put(iFile.getId(), iFile);
             }
 
-            conn.close();
-
-        } catch (Exception e) {
-            System.err.println("updateParameters error! ");
-            System.err.println(e.getMessage());
-        }
-    }
-
-    private void updateHouse() {
-        try {
-            String url = "jdbc:mysql://mdn1.timeweb.ru:3306/bgnsk_newbgnsk?characterEncoding=UTF-8";
-            Connection conn = DriverManager.getConnection(url, "bgnsk_newbgnsk", "3FM82BlmwL4uxd9jyiku");
-            Statement stmt = conn.createStatement();
-
-
-            ResultSet rs;
+            /* updateHouse */
             rs = stmt.executeQuery("SELECT * FROM b_iblock_element_prop_s80;");
             while (rs.next()) {
                 House house = new House();

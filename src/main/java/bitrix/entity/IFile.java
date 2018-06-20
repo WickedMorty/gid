@@ -42,4 +42,9 @@ public class IFile {
     public void setName(String name) {
         this.name = name;
     }
+
+    @Override
+    public String toString() {
+        return subdir + "/" + name;
+    }
 }

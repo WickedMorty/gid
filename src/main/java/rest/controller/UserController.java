@@ -13,6 +13,7 @@ import rest.service.controller.UserAuthResponseService;
 import java.util.List;
 
 @RestController
+@CrossOrigin(origins = "http://localhost:4200")
 @RequestMapping("/api/user")
 public class UserController {
 
