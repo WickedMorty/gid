@@ -2,8 +2,10 @@ package rest.service.impl;
 
 import bitrix.entity.*;
 import bitrix.repository.ResidentialRepository;
+import freemarker.template.utility.HtmlEscape;
 import nar.NarXMLParser;
 import nar.entity.Apartment;
+import org.springframework.web.util.HtmlUtils;
 import other.DownloadFileFromUrl;
 import rest.entity.HouseCache;
 import rest.entity.ResidentialCache;
@@ -15,7 +17,10 @@ import rest.service.ResidentialService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.io.File;
+import java.security.Key;
 import java.sql.*;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -28,6 +33,7 @@ public class ResidentialServiceImpl implements ResidentialService {
     private HashMap<Integer, Iblock> cacheIBlock = new HashMap<>();
     private HashMap<Integer, IFile> cacheIFile = new HashMap<>();
     private HashMap<Integer, House> cacheHouse = new HashMap<>();
+    private List<Apartment> cacheApartment = new ArrayList<>();
     private List<String> error = new ArrayList<>();
 
     private String[] paramTables = {"accomplishments", "banks", "comfort", "deadline", "decoration", "developer",
@@ -38,6 +44,13 @@ public class ResidentialServiceImpl implements ResidentialService {
 
     @Autowired
     private ResidentialRepository residentialRepository;
+
+    @Override
+    public ResidentialCache getById(Integer id) {
+        checkUpdate();
+
+        return cache.get(id);
+    }
 
     @Override
     public List<ResidentialMin> getResidentialMin() {
@@ -77,14 +90,6 @@ public class ResidentialServiceImpl implements ResidentialService {
 
     private void updater() {
         updateParameters();
-
-//        List<Apartment> apartmentList = null;
-//
-//        String outputFile = System.getProperty("user.dir") + "\\apartment.xml";
-//        if (DownloadFileFromUrl.DownloadFileFromUrl("http://mls-nsk.ru/files/newbuilding_export.yml", outputFile)) {
-//            apartmentList = NarXMLParser.parsingXmlFile(outputFile);
-//        }
-
 
         List<Residential> residentialList = residentialRepository.findAll();
 
@@ -134,7 +139,7 @@ public class ResidentialServiceImpl implements ResidentialService {
                 houseOut.setPayment(setParam(house.getValue().getPROPERTY_1141(), "pa"));
                 houseOut.setBank(setParam(house.getValue().getPROPERTY_1142(), "bk"));
 
-
+//
 //                List<Apartment> apartmentsByDeveloper = apartmentList.stream()
 //                        .filter(item -> item.getDeveloper().equals(residentialOut.getName()))
 //                        .collect(Collectors.toList());
@@ -148,6 +153,15 @@ public class ResidentialServiceImpl implements ResidentialService {
             }
 
             cacheItem.setHouses(houses);
+
+            List<Apartment> apartments = new ArrayList<>();
+            for(Apartment ap: cacheApartment) {
+                if(ap.getBuilding().equals(cacheItem.getName())) {
+                    apartments.add(ap);
+                }
+            }
+
+            cacheItem.setApartments(apartments);
 
             cache.put(cacheItem.getId(), cacheItem);
         }
@@ -334,9 +348,11 @@ public class ResidentialServiceImpl implements ResidentialService {
         for (String item : filterSearchData(searchData, "pa")) {
             for (Map.Entry<Integer, ResidentialCache> rc : cache.entrySet()) {
                 for (HouseCache cp : rc.getValue().getHouses()) {
-                    for (CustomParameter cp2 : cp.getPayment()) {
-                        if (cp2.getXmlId().equals(item)) {
-                            pay.add(rc.getValue());
+                    if(cp.getPayment() != null) {
+                        for (CustomParameter cp2 : cp.getPayment()) {
+                            if (cp2.getXmlId().equals(item)) {
+                                pay.add(rc.getValue());
+                            }
                         }
                     }
                 }
@@ -466,7 +482,7 @@ public class ResidentialServiceImpl implements ResidentialService {
             }
 
             /* updateHouse */
-            rs = stmt.executeQuery("SELECT * FROM b_iblock_element_prop_s80;");
+            rs = stmt.executeQuery("SELECT * FROM b_iblock_element_prop_s80");
             while (rs.next()) {
                 House house = new House();
                 house.setId(rs.getInt("IBLOCK_ELEMENT_ID"));
@@ -484,10 +500,71 @@ public class ResidentialServiceImpl implements ResidentialService {
 
             conn.close();
 
+            /* updateApartment */
+
+            String outputFile = System.getProperty("user.dir") + "\\apartment.xml";
+
+            //Check last modified date
+            File file = new File(outputFile);
+            SimpleDateFormat sdf = new SimpleDateFormat("dd");
+
+            Calendar cal = Calendar.getInstance();
+            int dayOfMonth = cal.get(Calendar.DAY_OF_MONTH);
+
+
+            if(dayOfMonth != Integer.valueOf(sdf.format(file.lastModified()))) {
+                DownloadFileFromUrl.DownloadFileFromUrl("http://mls-nsk.ru/files/newbuilding_export.yml", outputFile);
+            }
+
+            cacheApartment = NarXMLParser.parsingXmlFile(outputFile);
+
         } catch (Exception e) {
             System.err.println("updateParameters error! ");
             System.err.println(e.getMessage());
         }
     }
 
+    @Override
+    public DataToFastSelect getParameterValue(DataToFastSelect data) {
+        checkUpdate();
+
+        if(data.getText().equals("bank")) {
+            for(Map.Entry<Integer, ResidentialCache> rc: cache.entrySet()) {
+                for(HouseCache hc: rc.getValue().getHouses()) {
+                    if(hc.getId() == Integer.parseInt(data.getValue())) {
+                        DataToFastSelect dtfs = new DataToFastSelect();
+                        dtfs.setText(hc.banksToString());
+                        return dtfs;
+                    }
+                }
+            }
+        }
+
+
+        DataToFastSelect res = new DataToFastSelect();
+        ResidentialCache item = cache.get(Integer.parseInt(data.getValue()));
+        if(item == null) {
+            return null;
+        }
+
+        switch (data.getText()) {
+            case "detailText":
+                res.setText(item.getDetailText());
+                break;
+            case "form1":
+                res.setText(item.getForm1());
+                break;
+            case "form2":
+                res.setText(item.getForm2());
+                break;
+            case "percent":
+                res.setText(item.getPercent());
+                break;
+            case "files":
+                res.setText(item.getFiles());
+                break;
+        }
+
+        return res;
+    }
 }
