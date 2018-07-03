@@ -110,6 +110,9 @@ public class ResidentialCache {
     }
 
     public CustomParameter getDistrict() {
+        if(district == null) {
+            return new CustomParameter();
+        }
         return district;
     }
 
@@ -126,6 +129,9 @@ public class ResidentialCache {
     }
 
     public CustomParameter getSubway() {
+        if(subway == null) {
+            return new CustomParameter();
+        }
         return subway;
     }
 

@@ -36,6 +36,9 @@ public class ResidentialServiceImpl implements ResidentialService {
     private List<Apartment> cacheApartment = new ArrayList<>();
     private List<String> error = new ArrayList<>();
 
+    private HashMap<String, HashSet<ResidentialCache>> xmlIdAndCache = new HashMap<>();
+    private HashMap<String, HashSet<CustomParameter>> cpCache = new HashMap<>();
+
     private String[] paramTables = {"accomplishments", "banks", "comfort", "deadline", "decoration", "developer",
             "district", "ecologicals", "externals", "internals", "material", "pay", "securities", "subway_station"};
     private HashMap<Integer, ResidentialCache> cache = new HashMap<>();
@@ -85,6 +88,29 @@ public class ResidentialServiceImpl implements ResidentialService {
     private void checkUpdate() {
         if (cacheParameter.isEmpty() || cacheIBlock.isEmpty() || cacheIFile.isEmpty() || cacheHouse.isEmpty() || cache.isEmpty()) {
             this.updater();
+        }
+    }
+
+    private void insertToXmlCache(CustomParameter customParameter, ResidentialCache value) {
+        if (value == null || customParameter == null) return;
+        if (customParameter.getXmlId().isEmpty()) return;
+
+        if (xmlIdAndCache.get(customParameter.getXmlId()) != null) {
+            xmlIdAndCache.get(customParameter.getXmlId()).add(value);
+        } else {
+            HashSet<ResidentialCache> objects = new HashSet<>();
+            objects.add(value);
+            xmlIdAndCache.put(customParameter.getXmlId(), objects);
+        }
+
+        String key = customParameter.getXmlId().replaceAll("[0-9]", "");
+
+        if (cpCache.get(key) != null) {
+            cpCache.get(key).add(customParameter);
+        } else {
+            HashSet<CustomParameter> customParameters = new HashSet<>();
+            customParameters.add(customParameter);
+            cpCache.put(key, customParameters);
         }
     }
 
@@ -155,8 +181,8 @@ public class ResidentialServiceImpl implements ResidentialService {
             cacheItem.setHouses(houses);
 
             List<Apartment> apartments = new ArrayList<>();
-            for(Apartment ap: cacheApartment) {
-                if(ap.getBuilding().equals(cacheItem.getName())) {
+            for (Apartment ap : cacheApartment) {
+                if (ap.getBuilding().equals(cacheItem.getName())) {
                     apartments.add(ap);
                 }
             }
@@ -164,6 +190,46 @@ public class ResidentialServiceImpl implements ResidentialService {
             cacheItem.setApartments(apartments);
 
             cache.put(cacheItem.getId(), cacheItem);
+
+            /*Update xmlIdAndCache*/
+            insertToXmlCache(cacheItem.getSubway(), cacheItem);
+            insertToXmlCache(cacheItem.getDistrict(), cacheItem);
+            insertToXmlCache(cacheItem.getDeveloper(), cacheItem);
+            insertToXmlCache(cacheItem.getComfort(), cacheItem);
+            for (CustomParameter cp : cacheItem.getSecurities()) {
+                insertToXmlCache(cp, cacheItem);
+            }
+            for (CustomParameter cp : cacheItem.getEcologicals()) {
+                insertToXmlCache(cp, cacheItem);
+            }
+            for (CustomParameter cp : cacheItem.getInternals()) {
+                insertToXmlCache(cp, cacheItem);
+            }
+            for (CustomParameter cp : cacheItem.getExternals()) {
+                insertToXmlCache(cp, cacheItem);
+            }
+            for (CustomParameter cp : cacheItem.getAccomplishments()) {
+                insertToXmlCache(cp, cacheItem);
+            }
+
+            for (HouseCache house : cacheItem.getHouses()) {
+                if(house.getBank() != null) {
+                    for (CustomParameter cp : house.getBank()) {
+                        insertToXmlCache(cp, cacheItem);
+                    }
+                }
+
+                if(house.getPayment() != null) {
+                    for (CustomParameter cp : house.getPayment()) {
+                        insertToXmlCache(cp, cacheItem);
+                    }
+                }
+
+                insertToXmlCache(house.getDeadline(), cacheItem);
+                insertToXmlCache(house.getDecoration(), cacheItem);
+                insertToXmlCache(house.getMaterial(), cacheItem);
+            }
+            /*End update xmlIdAndCache*/
         }
 
     }
@@ -194,11 +260,11 @@ public class ResidentialServiceImpl implements ResidentialService {
 
     private List<ResidentialCache> unionList(List<ResidentialCache> result, Set<ResidentialCache> l2) {
 
-
+        if (result == null) return null;
         if (result.isEmpty()) return null;
 
         List<ResidentialCache> l2List = new ArrayList<>();
-        for(ResidentialCache item: l2) {
+        for (ResidentialCache item : l2) {
             l2List.add(item);
         }
 
@@ -211,8 +277,8 @@ public class ResidentialServiceImpl implements ResidentialService {
             l1hm.put(rc.getId(), rc);
         }
 
-        for(ResidentialCache rc: l2List) {
-            if(rc.equals(l1hm.get(rc.getId()))) {
+        for (ResidentialCache rc : l2List) {
+            if (rc.equals(l1hm.get(rc.getId()))) {
                 res.add(rc);
             }
         }
@@ -228,177 +294,28 @@ public class ResidentialServiceImpl implements ResidentialService {
 
         List<ResidentialCache> res = new ArrayList<>();
 
-        for(Map.Entry<Integer, ResidentialCache> entry: cache.entrySet()) {
+        for (Map.Entry<Integer, ResidentialCache> entry : cache.entrySet()) {
             res.add(entry.getValue());
         }
 
         Set<ResidentialCache> residential = new LinkedHashSet<>();
-        Set<ResidentialCache> accomplishments = new LinkedHashSet<>();
-        Set<ResidentialCache> banks = new LinkedHashSet<>();
-        Set<ResidentialCache> pay = new LinkedHashSet<>();
-        Set<ResidentialCache> externals = new LinkedHashSet<>();
-        Set<ResidentialCache> internals = new LinkedHashSet<>();
-        Set<ResidentialCache> ecologicals = new LinkedHashSet<>();
-        Set<ResidentialCache> securities = new LinkedHashSet<>();
-        Set<ResidentialCache> comfort = new LinkedHashSet<>();
-        Set<ResidentialCache> deadline = new LinkedHashSet<>();
-        Set<ResidentialCache> decoration = new LinkedHashSet<>();
-        Set<ResidentialCache> developer = new LinkedHashSet<>();
-        Set<ResidentialCache> district = new LinkedHashSet<>();
-        Set<ResidentialCache> material = new LinkedHashSet<>();
-        Set<ResidentialCache> subway_station = new LinkedHashSet<>();
 
         for (Integer id : filterSearchData(searchData)) {
             residential.add(cache.get(id));
         }
         res = unionList(res, residential);
-        for (String item : filterSearchData(searchData, "su")) {
-            for (Map.Entry<Integer, ResidentialCache> rc : cache.entrySet()) {
-                if(rc.getValue().getSubway() != null) {
-                    if (rc.getValue().getSubway().getXmlId().equals(item)) {
-                        subway_station.add(rc.getValue());
-                    }
-                }
+
+        String[] patterns = {"su", "dt", "dv", "cf", "sc", "eg", "in", "ex", "ac", "bk", "pa", "dl", "dc", "mt"};
+
+        for (String pattern : patterns) {
+            for (String item : filterSearchData(searchData, pattern)) {
+                res = unionList(res, xmlIdAndCache.get(item));
             }
         }
-        res = unionList(res, subway_station);
-        for (String item : filterSearchData(searchData, "dt")) {
-            for (Map.Entry<Integer, ResidentialCache> rc : cache.entrySet()) {
-                if (rc.getValue().getDistrict().getXmlId().equals(item)) {
-                    district.add(rc.getValue());
-                }
-            }
-        }
-        res = unionList(res, district);
-        for (String item : filterSearchData(searchData, "dv")) {
-            for (Map.Entry<Integer, ResidentialCache> rc : cache.entrySet()) {
-                if (rc.getValue().getDeveloper().getXmlId().equals(item)) {
-                    developer.add(rc.getValue());
-                }
-            }
-        }
-        res = unionList(res, developer);
-        for (String item : filterSearchData(searchData, "cf")) {
-            for (Map.Entry<Integer, ResidentialCache> rc : cache.entrySet()) {
-                if (rc.getValue().getComfort().getXmlId().equals(item)) {
-                    comfort.add(rc.getValue());
-                }
-            }
-        }
-        res = unionList(res, comfort);
-        for (String item : filterSearchData(searchData, "sc")) {
-            for (Map.Entry<Integer, ResidentialCache> rc : cache.entrySet()) {
-                for (CustomParameter cp : rc.getValue().getSecurities()) {
-                    if (cp.getXmlId().equals(item)) {
-                        securities.add(rc.getValue());
-                    }
-                }
-            }
-        }
-        res = unionList(res, securities);
-        for (String item : filterSearchData(searchData, "eg")) {
-            for (Map.Entry<Integer, ResidentialCache> rc : cache.entrySet()) {
-                for (CustomParameter cp : rc.getValue().getEcologicals()) {
-                    if (cp.getXmlId().equals(item)) {
-                        ecologicals.add(rc.getValue());
-                    }
-                }
-            }
-        }
-        res = unionList(res, ecologicals);
-        for (String item : filterSearchData(searchData, "in")) {
-            for (Map.Entry<Integer, ResidentialCache> rc : cache.entrySet()) {
-                for (CustomParameter cp : rc.getValue().getInternals()) {
-                    if (cp.getXmlId().equals(item)) {
-                        internals.add(rc.getValue());
-                    }
-                }
-            }
-        }
-        res = unionList(res, internals);
-        for (String item : filterSearchData(searchData, "ex")) {
-            for (Map.Entry<Integer, ResidentialCache> rc : cache.entrySet()) {
-                for (CustomParameter cp : rc.getValue().getExternals()) {
-                    if (cp.getXmlId().equals(item)) {
-                        externals.add(rc.getValue());
-                    }
-                }
-            }
-        }
-        res = unionList(res, externals);
-        for (String item : filterSearchData(searchData, "ac")) {
-            for (Map.Entry<Integer, ResidentialCache> rc : cache.entrySet()) {
-                for (CustomParameter cp : rc.getValue().getAccomplishments()) {
-                    if (cp.getXmlId().equals(item)) {
-                        accomplishments.add(rc.getValue());
-                    }
-                }
-            }
-        }
-        res = unionList(res, accomplishments);
-        for (String item : filterSearchData(searchData, "bk")) {
-            for (Map.Entry<Integer, ResidentialCache> rc : cache.entrySet()) {
-                for (HouseCache cp : rc.getValue().getHouses()) {
-                    if(cp.getBank() != null) {
-                        for (CustomParameter cp2 : cp.getBank()) {
-                            if (cp2.getXmlId().equals(item)) {
-                                banks.add(rc.getValue());
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        res = unionList(res, banks);
-        for (String item : filterSearchData(searchData, "pa")) {
-            for (Map.Entry<Integer, ResidentialCache> rc : cache.entrySet()) {
-                for (HouseCache cp : rc.getValue().getHouses()) {
-                    if(cp.getPayment() != null) {
-                        for (CustomParameter cp2 : cp.getPayment()) {
-                            if (cp2.getXmlId().equals(item)) {
-                                pay.add(rc.getValue());
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        res = unionList(res, pay);
-        for (String item : filterSearchData(searchData, "dl")) {
-            for (Map.Entry<Integer, ResidentialCache> rc : cache.entrySet()) {
-                for (HouseCache cp : rc.getValue().getHouses()) {
-                    if (cp.getDeadline().getXmlId().equals(item)) {
-                        deadline.add(rc.getValue());
-                    }
-                }
-            }
-        }
-        res = unionList(res, deadline);
-        for (String item : filterSearchData(searchData, "dc")) {
-            for (Map.Entry<Integer, ResidentialCache> rc : cache.entrySet()) {
-                for (HouseCache cp : rc.getValue().getHouses()) {
-                    if (cp.getDecoration().getXmlId().equals(item)) {
-                        decoration.add(rc.getValue());
-                    }
-                }
-            }
-        }
-        res = unionList(res, decoration);
-        for (String item : filterSearchData(searchData, "mt")) {
-            for (Map.Entry<Integer, ResidentialCache> rc : cache.entrySet()) {
-                for (HouseCache cp : rc.getValue().getHouses()) {
-                    if(cp.getMaterial() != null) {
-                        if (cp.getMaterial().getXmlId().equals(item)) {
-                            material.add(rc.getValue());
-                        }
-                    }
-                }
-            }
-        }
-        res = unionList(res, material);
+
 
         List<ResidentialMin> endRes = new ArrayList<>();
-        for(ResidentialCache rc: res) {
+        for (ResidentialCache rc : res) {
             endRes.add(new ResidentialMin(rc));
         }
 
@@ -519,7 +436,7 @@ public class ResidentialServiceImpl implements ResidentialService {
             int dayOfMonth = cal.get(Calendar.DAY_OF_MONTH);
 
 
-            if(dayOfMonth != Integer.valueOf(sdf.format(file.lastModified()))) {
+            if (dayOfMonth != Integer.valueOf(sdf.format(file.lastModified()))) {
                 DownloadFileFromUrl.DownloadFileFromUrl("http://mls-nsk.ru/files/newbuilding_export.yml", outputFile);
             }
 
@@ -535,10 +452,10 @@ public class ResidentialServiceImpl implements ResidentialService {
     public DataToFastSelect getParameterValue(DataToFastSelect data) {
         checkUpdate();
 
-        if(data.getText().equals("bank")) {
-            for(Map.Entry<Integer, ResidentialCache> rc: cache.entrySet()) {
-                for(HouseCache hc: rc.getValue().getHouses()) {
-                    if(hc.getId() == Integer.parseInt(data.getValue())) {
+        if (data.getText().equals("bank")) {
+            for (Map.Entry<Integer, ResidentialCache> rc : cache.entrySet()) {
+                for (HouseCache hc : rc.getValue().getHouses()) {
+                    if (hc.getId() == Integer.parseInt(data.getValue())) {
                         DataToFastSelect dtfs = new DataToFastSelect();
                         dtfs.setText(hc.banksToString());
                         return dtfs;
@@ -550,7 +467,7 @@ public class ResidentialServiceImpl implements ResidentialService {
 
         DataToFastSelect res = new DataToFastSelect();
         ResidentialCache item = cache.get(Integer.parseInt(data.getValue()));
-        if(item == null) {
+        if (item == null) {
             return null;
         }
 
