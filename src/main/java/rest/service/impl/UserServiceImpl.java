@@ -33,7 +33,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public User findByid(Integer id) {
+    public User findById(Integer id) {
         User user = new User();
         user = userRepository.findOne(id);
         user.setPassword("");

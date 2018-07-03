@@ -35,7 +35,7 @@ public class NarXMLParser {
                     Element eElement = (Element) nNode;
 
                     Apartment apartment = new Apartment();
-                    apartment.setDeveloper(eElement.getElementsByTagName("building-name").item(0).getTextContent());
+                    apartment.setBuilding(eElement.getElementsByTagName("building-name").item(0).getTextContent());
                     apartment.setAddress(eElement.getElementsByTagName("address").item(0).getTextContent());
                     apartment.setFloor(eElement.getElementsByTagName("floor").item(0).getTextContent());
                     apartment.setImage(eElement.getElementsByTagName("image").item(0).getTextContent());

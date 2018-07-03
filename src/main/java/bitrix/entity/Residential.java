@@ -62,6 +62,12 @@ public class Residential {
     @Column(name = "PROPERTY_1144")
     private String PROPERTY_1144;
 
+    @Column(name = "PROPERTY_1145")
+    private String PROPERTY_1145;
+
+    @Column(name = "PROPERTY_1146")
+    private String PROPERTY_1146;
+
     public Residential() {
         this.PROPERTY_1125 = 0;
         this.PROPERTY_1127 = 0;
@@ -210,5 +216,21 @@ public class Residential {
 
     public void setPROPERTY_1144(String PROPERTY_1144) {
         this.PROPERTY_1144 = PROPERTY_1144;
+    }
+
+    public String getPROPERTY_1145() {
+        return PROPERTY_1145;
+    }
+
+    public void setPROPERTY_1145(String PROPERTY_1145) {
+        this.PROPERTY_1145 = PROPERTY_1145;
+    }
+
+    public String getPROPERTY_1146() {
+        return PROPERTY_1146;
+    }
+
+    public void setPROPERTY_1146(String PROPERTY_1146) {
+        this.PROPERTY_1146 = PROPERTY_1146;
     }
 }

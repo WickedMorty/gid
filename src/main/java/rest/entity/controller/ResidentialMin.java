@@ -14,6 +14,8 @@ public class ResidentialMin {
     private boolean form1 = false;
     private boolean form2 = false;
     private boolean contact = false;
+    private boolean percent = false;
+    private boolean files = false;
 
     private boolean checkString(String value) {
         if(value == null) {
@@ -38,6 +40,8 @@ public class ResidentialMin {
         contact = checkString(residential.getDetailText());
         form1 = checkString(residential.getForm1());
         form2 = checkString(residential.getForm2());
+        percent = checkString(residential.getPercent());
+        files = checkString(residential.getFiles());
     }
 
     public boolean isForm1() {
@@ -118,5 +122,21 @@ public class ResidentialMin {
 
     public void setDeadline(String deadline) {
         this.deadline = deadline;
+    }
+
+    public boolean isPercent() {
+        return percent;
+    }
+
+    public void setPercent(boolean percent) {
+        this.percent = percent;
+    }
+
+    public boolean isFiles() {
+        return files;
+    }
+
+    public void setFiles(boolean files) {
+        this.files = files;
     }
 }

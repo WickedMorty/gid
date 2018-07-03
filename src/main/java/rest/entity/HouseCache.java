@@ -11,19 +11,19 @@ public class HouseCache {
     private Integer id;
     private String name;
     private Integer floor;
+    private String address;
     private CustomParameter deadline = new CustomParameter();
     private CustomParameter decoration = new CustomParameter();
     private CustomParameter material = new CustomParameter();
     private List<CustomParameter> payment = new ArrayList<>();
     private List<CustomParameter> bank = new ArrayList<>();
-    private List<Apartment> apartments = new ArrayList<>();
 
     public HouseCache() {
     }
 
     public HouseCache(House house) {
         setId(house.getId());
-        setName(house.getPROPERTY_1136());
+        setAddress(house.getPROPERTY_1136());
         setFloor(house.getPROPERTY_1137());
     }
 
@@ -91,11 +91,19 @@ public class HouseCache {
         this.bank = bank;
     }
 
-    public List<Apartment> getApartments() {
-        return apartments;
+    public String getAddress() {
+        return address;
     }
 
-    public void setApartments(List<Apartment> apartments) {
-        this.apartments = apartments;
+    public void setAddress(String address) {
+        this.address = address;
+    }
+
+    public String banksToString() {
+        String ret = "";
+        for(CustomParameter cp: bank) {
+            ret = ret.concat(cp.getName() + ";");
+        }
+        return ret;
     }
 }

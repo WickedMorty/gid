@@ -1,6 +1,5 @@
 package rest.service;
 
-import bitrix.entity.Residential;
 import rest.entity.ResidentialCache;
 import rest.entity.controller.DataToFastSelect;
 import rest.entity.controller.ResidentialMin;
@@ -13,4 +12,6 @@ public interface ResidentialService {
     List<DataToFastSelect> getAllParam();
     List<ResidentialMin> getResidentialMin();
     List<ResidentialMin> getResidentialMinBySearch(SearchData[] searchData);
+    ResidentialCache getById(Integer id);
+    DataToFastSelect getParameterValue(DataToFastSelect data);
 }

@@ -1,7 +1,7 @@
 package nar.entity;
 
 public class Apartment {
-    private String developer;
+    private String building;
     private String address;
     private String floor;
     private String image;
@@ -12,12 +12,12 @@ public class Apartment {
     public Apartment() {
     }
 
-    public String getDeveloper() {
-        return developer;
+    public String getBuilding() {
+        return building;
     }
 
-    public void setDeveloper(String developer) {
-        this.developer = developer;
+    public void setBuilding(String building) {
+        this.building = building;
     }
 
     public String getAddress() {
@@ -71,7 +71,7 @@ public class Apartment {
     @Override
     public String toString() {
         return "Apartment{" +
-                "developer='" + developer + '\'' +
+                "developer='" + building + '\'' +
                 ", address='" + address + '\'' +
                 ", floor='" + floor + '\'' +
                 ", image='" + image + '\'' +

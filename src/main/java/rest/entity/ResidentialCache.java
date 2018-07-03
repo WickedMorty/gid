@@ -4,9 +4,13 @@ import bitrix.entity.House;
 import bitrix.entity.HouseOut;
 import bitrix.entity.IFile;
 import bitrix.entity.Residential;
+import nar.entity.Apartment;
+import org.springframework.web.util.HtmlUtils;
 import rest.entity.controller.CustomParameter;
 import rest.entity.controller.ResidentialMin;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -34,7 +38,10 @@ public class ResidentialCache {
     private String detailText;
     private String form1;
     private String form2;
+    private String percent;
+    private String files;
     private List<HouseCache> houses = new ArrayList<>();
+    private List<Apartment> apartments = new ArrayList<>();
 
     public ResidentialCache() {
     }
@@ -49,6 +56,12 @@ public class ResidentialCache {
         setBus(residential.getPROPERTY_1126());
         setBusMin(residential.getPROPERTY_1127());
         setParking(residential.getPROPERTY_1128());
+        if(residential.getPROPERTY_1145() != null) {
+            setPercent(residential.getPROPERTY_1145().replaceAll("^(.*)\"TEXT\";s:(\\d*):\"", "").replaceAll("\";s:(\\d*):\"TYPE\"(.*)$", ""));
+        }
+        if(residential.getPROPERTY_1146() != null) {
+            setFiles(residential.getPROPERTY_1146().replaceAll("^(.*)\"TEXT\";s:(\\d*):\"", "").replaceAll("\";s:(\\d*):\"TYPE\"(.*)$", ""));
+        }
     }
 
     public String getDeadline() {
@@ -205,6 +218,11 @@ public class ResidentialCache {
     }
 
     public void setImage(IFile image) {
+        try {
+            image.setName(URLEncoder.encode(image.getName(), "UTF-8").replace("+", "%20"));
+        } catch (UnsupportedEncodingException e) {
+            e.printStackTrace();
+        }
         this.image = image;
     }
 
@@ -213,6 +231,11 @@ public class ResidentialCache {
     }
 
     public void setImageBig(IFile imageBig) {
+        try {
+            imageBig.setName(URLEncoder.encode(imageBig.getName(), "UTF-8").replace("+", "%20"));
+        } catch (UnsupportedEncodingException e) {
+            e.printStackTrace();
+        }
         this.imageBig = imageBig;
     }
 
@@ -254,5 +277,29 @@ public class ResidentialCache {
 
     public void setHouses(List<HouseCache> houses) {
         this.houses = houses;
+    }
+
+    public List<Apartment> getApartments() {
+        return apartments;
+    }
+
+    public void setApartments(List<Apartment> apartments) {
+        this.apartments = apartments;
+    }
+
+    public String getPercent() {
+        return percent;
+    }
+
+    public void setPercent(String percent) {
+        this.percent = percent;
+    }
+
+    public String getFiles() {
+        return files;
+    }
+
+    public void setFiles(String files) {
+        this.files = files;
     }
 }

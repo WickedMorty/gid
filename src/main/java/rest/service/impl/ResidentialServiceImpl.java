@@ -194,6 +194,7 @@ public class ResidentialServiceImpl implements ResidentialService {
 
     private List<ResidentialCache> unionList(List<ResidentialCache> result, Set<ResidentialCache> l2) {
 
+
         if (result.isEmpty()) return null;
 
         List<ResidentialCache> l2List = new ArrayList<>();
@@ -223,6 +224,8 @@ public class ResidentialServiceImpl implements ResidentialService {
     public List<ResidentialMin> getResidentialMinBySearch(SearchData[] searchData) {
         checkUpdate();
 
+        // все это гавнище нужно рефракторить, но похоже после релиза
+
         List<ResidentialCache> res = new ArrayList<>();
 
         for(Map.Entry<Integer, ResidentialCache> entry: cache.entrySet()) {
@@ -251,8 +254,10 @@ public class ResidentialServiceImpl implements ResidentialService {
         res = unionList(res, residential);
         for (String item : filterSearchData(searchData, "su")) {
             for (Map.Entry<Integer, ResidentialCache> rc : cache.entrySet()) {
-                if (rc.getValue().getSubway().getXmlId().equals(item)) {
-                    subway_station.add(rc.getValue());
+                if(rc.getValue().getSubway() != null) {
+                    if (rc.getValue().getSubway().getXmlId().equals(item)) {
+                        subway_station.add(rc.getValue());
+                    }
                 }
             }
         }
@@ -382,8 +387,10 @@ public class ResidentialServiceImpl implements ResidentialService {
         for (String item : filterSearchData(searchData, "mt")) {
             for (Map.Entry<Integer, ResidentialCache> rc : cache.entrySet()) {
                 for (HouseCache cp : rc.getValue().getHouses()) {
-                    if (cp.getMaterial().getXmlId().equals(item)) {
-                        material.add(rc.getValue());
+                    if(cp.getMaterial() != null) {
+                        if (cp.getMaterial().getXmlId().equals(item)) {
+                            material.add(rc.getValue());
+                        }
                     }
                 }
             }

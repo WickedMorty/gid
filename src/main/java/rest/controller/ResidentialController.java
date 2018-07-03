@@ -16,15 +16,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 @RestController
-@CrossOrigin(origins = "http://localhost:4200")
+@CrossOrigin(origins = "http://192.168.9.155:4200")
 @RequestMapping("/api/residential")
 public class ResidentialController {
 
     @Autowired
     ResidentialService residentialService;
-
-    private List<ResidentialOut> residentialCache = null;
-    //private List<ResidentialOut> residentialMinCache = null;
 
     @GetMapping("/params")
     public List<DataToFastSelect> getDataToFastSelect() {
@@ -38,11 +35,21 @@ public class ResidentialController {
 
     @PostMapping("/all")
     public List<ResidentialMin> getBySearch(@RequestBody SearchData[] data) {
-        for (SearchData sd: data) {
+        for (SearchData sd : data) {
             System.out.println("get: " + sd.getValue());
         }
 
         return residentialService.getResidentialMinBySearch(data);
+    }
+
+    @PostMapping("/id/{id}")
+    public ResidentialCache getBuId(@PathVariable final Integer id) {
+        return residentialService.getById(id);
+    }
+
+    @PostMapping("/getParameterValue")
+    public DataToFastSelect getParameterValue(@RequestBody DataToFastSelect data) {
+        return residentialService.getParameterValue(data);
     }
 
 //    @GetMapping("/searchparam/")
@@ -404,18 +411,5 @@ public class ResidentialController {
 //        return residentialOutList;
 //    }
 
-//    @GetMapping("/id/{id}")
-//    public ResidentialOut getBuId(@PathVariable final Integer id) {
-//        if(residentialCache == null) {
-//            residentialCache = residentialService.findAll();
-//        }
-//
-//        for (ResidentialOut residential: residentialCache) {
-//            if(residential.getId().equals(id)) {
-//                return residential;
-//            }
-//        }
-//
-//        return null;
-//    }
+
 }

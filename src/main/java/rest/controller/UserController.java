@@ -13,7 +13,7 @@ import rest.service.controller.UserAuthResponseService;
 import java.util.List;
 
 @RestController
-@CrossOrigin(origins = "http://localhost:4200")
+@CrossOrigin(origins = "http://192.168.9.155:4200")
 @RequestMapping("/api/user")
 public class UserController {
 
@@ -38,7 +38,7 @@ public class UserController {
     //Устаревшая
     @GetMapping("/{id}")
     public User getById(@PathVariable final Integer id) {
-        return userService.findByid(id);
+        return userService.findById(id);
     }
 
     //Используют: ГидПоНовостройкам
